@@ -16,7 +16,7 @@ var accum int
 var hosthash []byte
 
 func init() {
-	hostname, _ := os.Hostname();
+	hostname, _ := os.Hostname()
 	h := md5.New()
 
 	h.Write([]byte(hostname))
@@ -29,14 +29,14 @@ func NewObjectId() (Element, os.Error) {
 		return nil, err
 	}
 
-	oid := make([]byte,12)
-	tmp := make([]byte,4)
+	oid := make([]byte, 12)
+	tmp := make([]byte, 4)
 
-	binary.BigEndian.PutUint32(oid[0:4],uint32(t64))
-	copy(oid[4:7],hosthash)
+	binary.BigEndian.PutUint32(oid[0:4], uint32(t64))
+	copy(oid[4:7], hosthash)
 
-	binary.BigEndian.PutUint32(tmp,uint32(os.Getpid()))
-	copy(oid[7:9],tmp[2:4])
+	binary.BigEndian.PutUint32(tmp, uint32(os.Getpid()))
+	copy(oid[7:9], tmp[2:4])
 
 	lock.Lock()
 	accum++
@@ -44,7 +44,7 @@ func NewObjectId() (Element, os.Error) {
 	lock.Unlock()
 
 	binary.BigEndian.PutUint32(tmp, uint32(inc))
-	copy(oid[9:12],tmp[1:4])
+	copy(oid[9:12], tmp[1:4])
 
 	x := ObjectId(oid)
 	return &x, nil

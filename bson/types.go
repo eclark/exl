@@ -39,7 +39,18 @@ const (
 	MaxType
 )
 
-func read(r io.Reader, data ... interface{}) (n int64, err os.Error) {
+type BinSubtype byte
+
+const (
+	GenericType BinSubtype = iota
+	FunctionType
+	OldBinaryType
+	UUIDType
+	MD5Type  BinSubtype = 5
+	UserType BinSubtype = 0x80
+)
+
+func read(r io.Reader, data ...interface{}) (n int64, err os.Error) {
 	for _, d := range data {
 		switch dt := reflect.NewValue(d).(type) {
 		case *reflect.PtrValue:
@@ -57,7 +68,7 @@ func read(r io.Reader, data ... interface{}) (n int64, err os.Error) {
 	return
 }
 
-func write(w io.Writer, data ... interface{}) (n int64, err os.Error) {
+func write(w io.Writer, data ...interface{}) (n int64, err os.Error) {
 	for _, d := range data {
 		n += int64(binary.TotalSize(reflect.NewValue(d)))
 		err = binary.Write(w, binary.LittleEndian, d)
@@ -99,7 +110,7 @@ func (d *Document) WriteTo(w io.Writer) (n int64, err os.Error) {
 			return
 		}
 	}
-	write(buf,byte(0))
+	write(buf, byte(0))
 	write(w, int32(buf.Len()+4))
 	io.Copy(w, buf)
 	return
@@ -113,7 +124,7 @@ func (d *Document) ReadFrom(r io.Reader) (n int64, err os.Error) {
 		return
 	}
 
-	bufd := make([]byte, 0, tBytelen - 4)
+	bufd := make([]byte, 0, tBytelen-4)
 	buf := bytes.NewBuffer(bufd)
 
 	m, err = buf.ReadFrom(r)
@@ -155,6 +166,24 @@ func (d *Document) ReadFrom(r io.Reader) (n int64, err os.Error) {
 	return
 }
 
+type ArrayDocument struct {
+	Document
+}
+
+func (ad *ArrayDocument) Append(value Element) {
+	ad.append(typeof(value), strconv.Itoa(len(ad.Document)), value)
+}
+
+type Double float64
+
+func (d *Double) WriteTo(w io.Writer) (n int64, err os.Error) {
+	return write(w, float64(*d))
+}
+
+func (d *Double) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	return read(r, d)
+}
+
 type String string
 
 func (s *String) String() string {
@@ -172,7 +201,7 @@ func (s *String) ReadFrom(r io.Reader) (n int64, err os.Error) {
 	if err != nil {
 		return
 	}
-	b := make([]byte,l)
+	b := make([]byte, l)
 	m, err = read(r, b)
 	n += m
 	if err != nil {
@@ -180,6 +209,32 @@ func (s *String) ReadFrom(r io.Reader) (n int64, err os.Error) {
 	}
 
 	*s = String(b[:len(b)-1])
+	return
+}
+
+type Binary struct {
+	Subtype byte
+	Data    []byte
+}
+
+func (b *Binary) WriteTo(w io.Writer) (n int64, err os.Error) {
+	return write(w, len(b.Data), b.Subtype, b.Data)
+}
+
+func (b *Binary) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	//TODO handle subtype 0x02
+	var l int32
+
+	m, err := read(r, &l, &b.Subtype)
+	n += m
+	if err != nil {
+		return
+	}
+
+	b.Data = make([]byte, l)
+
+	m, err = read(r, b.Data)
+	n += m
 	return
 }
 
@@ -191,7 +246,7 @@ func (o *ObjectId) String() string {
 
 func (o *ObjectId) WriteTo(w io.Writer) (n int64, err os.Error) {
 	if *o == nil {
-		*o = make([]byte,12)
+		*o = make([]byte, 12)
 	}
 	m, err := w.Write([]byte(*o))
 	n = int64(m)
@@ -200,19 +255,109 @@ func (o *ObjectId) WriteTo(w io.Writer) (n int64, err os.Error) {
 
 func (o *ObjectId) ReadFrom(r io.Reader) (n int64, err os.Error) {
 	if *o == nil {
-		*o = make([]byte,12)
+		*o = make([]byte, 12)
 	}
 	m, err := io.ReadFull(r, []byte(*o))
 	n = int64(m)
 	return
 }
 
+type Boolean bool
+
+func (b *Boolean) WriteTo(w io.Writer) (n int64, err os.Error) {
+	var v byte
+	if bool(*b) == true {
+		v = 1
+	}
+	return write(w, v)
+}
+
+func (b *Boolean) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	var v byte
+	n, err = read(r, &v)
+	if err != nil {
+		return
+	}
+
+	switch v {
+	case 0:
+		*b = false
+	case 1:
+		*b = true
+	default:
+		err = os.NewError("bad boolean code")
+	}
+
+	return
+}
+
+type Time int64
+
+func (t *Time) WriteTo(w io.Writer) (n int64, err os.Error) {
+	return write(w, *t)
+}
+
+func (t *Time) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	return read(r, t)
+}
+
+type Null struct{}
+
+func (x *Null) WriteTo(w io.Writer) (n int64, err os.Error) {
+	return
+}
+
+func (x *Null) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	return
+}
+
+type Regex struct {
+	Pattern string
+	Options string
+}
+
+func (re *Regex) WriteTo(w io.Writer) (n int64, err os.Error) {
+	return
+}
+
+func (re *Regex) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	return
+}
+
+type Code struct {
+	String
+}
+
+type Symbol struct {
+	String
+}
+
 func newElement(typ fieldType) (e Element) {
 	switch typ {
+	case DoubleType:
+		e = new(Double)
 	case StringType:
 		e = new(String)
+	case DocumentType:
+		e = new(Document)
+	case ArrayDocumentType:
+		e = new(ArrayDocument)
+	case BinaryType:
+		e = new(Binary)
 	case ObjectIdType:
 		e = new(ObjectId)
+	case BooleanType:
+		e = new(Boolean)
+	case NullType:
+		e = new(Null)
+	case RegexType:
+		e = new(Regex)
+	case dbPointerType:
+		panic("db pointers are not supported")
+	case CodeType:
+		e = new(Code)
+	case SymbolType:
+		e = new(Symbol)
 	default:
 		panic("unknown type" + strconv.Itoa(int(typ)))
 	}
@@ -221,12 +366,31 @@ func newElement(typ fieldType) (e Element) {
 
 func typeof(e Element) (f fieldType) {
 	switch e.(type) {
-		case *String:
-			f = StringType
-		case *ObjectId:
-			f = ObjectIdType
-		default:
-			panic("unknown element")
+	case *Double:
+		f = DoubleType
+	case *String:
+		f = StringType
+	case *Document:
+		f = DocumentType
+	case *ArrayDocument:
+		f = ArrayDocumentType
+	case *Binary:
+		f = BinaryType
+	case *ObjectId:
+		f = ObjectIdType
+	case *Boolean:
+		f = BooleanType
+	case *Null:
+		f = NullType
+	case *Regex:
+		f = RegexType
+	//TODO something with dbPointer
+	case *Code:
+		f = CodeType
+	case *Symbol:
+		f = SymbolType
+	default:
+		panic("unknown element")
 	}
 	return
 }

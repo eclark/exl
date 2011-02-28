@@ -10,13 +10,11 @@ import (
 	"time"
 )
 
-var _ mongo.BSON = new(wrapped)
-
 type wrapped struct {
 	e Element
 }
 
-func Wrap(e Element) *wrapped {
+func Wrap(e Element) mongo.BSON {
 	return &wrapped{e}
 }
 
@@ -25,7 +23,9 @@ func (w *wrapped) Kind() int {
 }
 
 func (w *wrapped) Number() float64 {
-	//TODO if type is Double return it or 0
+	if d, ok := w.e.(*Double); ok {
+		return float64(*d)
+	}
 	return 0
 }
 
@@ -40,14 +40,20 @@ func (w *wrapped) OID() []byte {
 	if o, ok := w.e.(*ObjectId); ok {
 		return []byte(*o)
 	}
-	return make([]byte,12)
+	return make([]byte, 12)
 }
 
 func (w *wrapped) Bool() bool {
+	if b, ok := w.e.(*Boolean); ok {
+		return bool(*b)
+	}
 	return false
 }
 
 func (w *wrapped) Date() *time.Time {
+	if t, ok := w.e.(*Time); ok {
+		return time.SecondsToUTC(int64(*t))
+	}
 	return nil
 }
 

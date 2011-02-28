@@ -60,3 +60,17 @@ func TestB(t *testing.T) {
 
 	fmt.Println(b.Bytes())
 }
+
+func TestDouble(t *testing.T) {
+	doc := new(Document)
+	f := Double(1.1243)
+	doc.Append("num", &f)
+
+	b := bytes.NewBuffer(nil)
+	_, err := doc.WriteTo(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Println(b.Bytes())
+}
