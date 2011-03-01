@@ -5,9 +5,10 @@
 
 include $(GOROOT)/src/Make.inc
 
-TARG=github.com/eclark/exl/bson
+DEPS=../
+
+TARG=github.com/eclark/exl/bson/bsoncompat
 GOFILES=\
-	types.go\
-	objectid.go\
+	compat.go\
 
 include $(GOROOT)/src/Make.pkg

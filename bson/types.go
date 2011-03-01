@@ -87,13 +87,13 @@ type Element interface {
 type dElement struct {
 	Element
 	typ fieldType
-	key string
+	Key string
 }
 
 type Document []dElement
 
 func (d *Document) Append(key string, value Element) {
-	d.append(typeof(value), key, value)
+	d.append(Typeof(value), key, value)
 }
 
 func (d *Document) append(typ fieldType, key string, e Element) {
@@ -103,7 +103,7 @@ func (d *Document) append(typ fieldType, key string, e Element) {
 func (d *Document) WriteTo(w io.Writer) (n int64, err os.Error) {
 	buf := bytes.NewBuffer(nil)
 	for _, de := range []dElement(*d) {
-		write(buf, de.typ, []byte(de.key), byte(0))
+		write(buf, de.typ, []byte(de.Key), byte(0))
 		m, err := de.WriteTo(buf)
 		n += m
 		if err != nil {
@@ -171,13 +171,13 @@ type ArrayDocument struct {
 }
 
 func (ad *ArrayDocument) Append(value Element) {
-	ad.append(typeof(value), strconv.Itoa(len(ad.Document)), value)
+	ad.append(Typeof(value), strconv.Itoa(len(ad.Document)), value)
 }
 
 type Double float64
 
 func (d *Double) WriteTo(w io.Writer) (n int64, err os.Error) {
-	return write(w, float64(*d))
+	return write(w, *d)
 }
 
 func (d *Double) ReadFrom(r io.Reader) (n int64, err os.Error) {
@@ -317,10 +317,36 @@ type Regex struct {
 }
 
 func (re *Regex) WriteTo(w io.Writer) (n int64, err os.Error) {
-	return
+	return write(w, re.Pattern, 0, re.Options, 0)
 }
 
 func (re *Regex) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	var v byte
+	b := make([]byte, 0, 16)
+
+	var pe bool
+	for {
+		m, err := read(r, &v)
+		n += m
+		if err != nil {
+			return
+		}
+
+		if v == 0 {
+			if !pe {
+				re.Pattern = string(b)
+				b = b[:0]
+				pe = true
+			} else {
+				re.Options = string(b)
+				b = b[:0]
+				return
+			}
+		} else {
+			b = append(b, v)
+		}
+	}
+
 	return
 }
 
@@ -330,6 +356,78 @@ type Code struct {
 
 type Symbol struct {
 	String
+}
+
+type ScopedCode struct {
+	Code  *Code
+	Scope *Document
+}
+
+func (sc *ScopedCode) WriteTo(w io.Writer) (n int64, err os.Error) {
+	buf := bytes.NewBuffer(nil)
+	_, err = sc.Code.WriteTo(buf)
+	if err != nil {
+		return
+	}
+	_, err = sc.Scope.WriteTo(buf)
+	if err != nil {
+		return
+	}
+
+	var l int32 = int32(buf.Len()) + 4
+
+	return write(w, l, buf.Bytes())
+}
+
+func (sc *ScopedCode) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	var l int32
+	m, err := read(r, &l)
+	n += m
+	if err != nil {
+		return
+	}
+	lr := io.LimitReader(r, int64(l-4))
+
+	sc.Code = new(Code)
+	m, err = sc.Code.ReadFrom(lr)
+	n += m
+	if err != nil {
+		return
+	}
+	sc.Scope = new(Document)
+	m, err = sc.Scope.ReadFrom(lr)
+	n += m
+	return
+}
+
+type Int32 int32
+
+func (i *Int32) WriteTo(w io.Writer) (n int64, err os.Error) {
+	return write(w, *i)
+}
+
+func (i *Int32) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	return read(r, i)
+}
+
+type Timestamp struct {
+	Int64
+}
+type Int64 int64
+
+func (i *Int64) WriteTo(w io.Writer) (n int64, err os.Error) {
+	return write(w, *i)
+}
+
+func (i *Int64) ReadFrom(r io.Reader) (n int64, err os.Error) {
+	return read(r, i)
+}
+
+type Min struct {
+	Null
+}
+type Max struct {
+	Null
 }
 
 func newElement(typ fieldType) (e Element) {
@@ -358,13 +456,25 @@ func newElement(typ fieldType) (e Element) {
 		e = new(Code)
 	case SymbolType:
 		e = new(Symbol)
+	case ScopedCodeType:
+		e = new(ScopedCode)
+	case Int32Type:
+		e = new(Int32)
+	case TimestampType:
+		e = new(Timestamp)
+	case Int64Type:
+		e = new(Int64)
+	case MinType:
+		e = new(Min)
+	case MaxType:
+		e = new(Max)
 	default:
 		panic("unknown type" + strconv.Itoa(int(typ)))
 	}
 	return
 }
 
-func typeof(e Element) (f fieldType) {
+func Typeof(e Element) (f fieldType) {
 	switch e.(type) {
 	case *Double:
 		f = DoubleType
@@ -389,6 +499,18 @@ func typeof(e Element) (f fieldType) {
 		f = CodeType
 	case *Symbol:
 		f = SymbolType
+	case *ScopedCode:
+		f = ScopedCodeType
+	case *Int32:
+		f = Int32Type
+	case *Timestamp:
+		f = TimestampType
+	case *Int64:
+		f = Int64Type
+	case *Min:
+		f = MinType
+	case *Max:
+		f = MaxType
 	default:
 		panic("unknown element")
 	}
