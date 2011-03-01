@@ -104,15 +104,21 @@ func (d *Document) WriteTo(w io.Writer) (n int64, err os.Error) {
 	buf := bytes.NewBuffer(nil)
 	for _, de := range []dElement(*d) {
 		write(buf, de.typ, []byte(de.Key), byte(0))
-		m, err := de.WriteTo(buf)
-		n += m
+		_, err := de.WriteTo(buf)
 		if err != nil {
 			return
 		}
 	}
-	write(buf, byte(0))
-	write(w, int32(buf.Len()+4))
-	io.Copy(w, buf)
+	_, err = write(buf, byte(0))
+	if err != nil {
+		return
+	}
+	n, err = write(w, int32(buf.Len()+4))
+	if err != nil {
+		return
+	}
+	m, err := io.Copy(w, buf)
+	n += m
 	return
 }
 

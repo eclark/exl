@@ -6,7 +6,6 @@ package bson
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/eclark/gomongo/mongo"
 	"testing"
 )
@@ -19,7 +18,6 @@ func TestA(t *testing.T) {
 	}
 
 	mongob := bs.Bytes()
-	fmt.Println(mongob)
 
 	buf := bytes.NewBuffer(mongob)
 
@@ -35,7 +33,6 @@ func TestA(t *testing.T) {
 	newb := bytes.NewBuffer(nil)
 	doc.WriteTo(newb)
 
-	fmt.Println(newb.Bytes())
 
 	if !bytes.Equal(mongob, newb.Bytes()) {
 		t.Fatal("unmatched")
@@ -58,7 +55,6 @@ func TestB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(b.Bytes())
 }
 
 func TestDouble(t *testing.T) {
@@ -72,5 +68,4 @@ func TestDouble(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(b.Bytes())
 }

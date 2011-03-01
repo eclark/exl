@@ -10,4 +10,15 @@ GOFILES=\
 	types.go\
 	objectid.go\
 
+# These targets are only useful for regenerating test data
+# Check the first line of gen.c for the gcc options
+
+testdata/gen: testdata/gen.c
+	$(shell cd testdata; $(shell head -1 testdata/gen.c | cut -b 4-); cd ..)
+
+testdata/hexdata: testdata/gen
+	testdata/gen >testdata/hexdata
+
+testdata: testdata/hexdata
+
 include $(GOROOT)/src/Make.pkg
