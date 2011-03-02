@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"github.com/eclark/exl/bson"
+	"github.com/eclark/exl/bson/bsoncompat"
 	"github.com/eclark/gomongo/mongo"
 	"hash"
 	"os"
@@ -183,7 +184,7 @@ func (f *File) Close() os.Error {
 	md5cmddoc.Append("filemd5", &oid)
 	md5cmddoc.Append("root", &pre)
 
-	res, err := f.db.Command(bson.Wrap(md5cmddoc))
+	res, err := f.db.Command(bsoncompat.Wrap(md5cmddoc))
 	if err != nil {
 		return err
 	}
