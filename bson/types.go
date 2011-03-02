@@ -7,7 +7,7 @@ package bson
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"encoding/hex"
 	"io"
 	"os"
 	"reflect"
@@ -104,7 +104,7 @@ func (d *Document) WriteTo(w io.Writer) (n int64, err os.Error) {
 	buf := bytes.NewBuffer(nil)
 	for _, de := range []dElement(*d) {
 		write(buf, de.typ, []byte(de.Key), byte(0))
-		_, err := de.WriteTo(buf)
+		_, err = de.WriteTo(buf)
 		if err != nil {
 			return
 		}
@@ -224,7 +224,10 @@ type Binary struct {
 }
 
 func (b *Binary) WriteTo(w io.Writer) (n int64, err os.Error) {
-	return write(w, len(b.Data), b.Subtype, b.Data)
+	if b.Subtype == 2 {
+		return write(w, int32(len(b.Data) + 4), b.Subtype, int32(len(b.Data)), b.Data)
+	}
+	return write(w, int32(len(b.Data)), b.Subtype, b.Data)
 }
 
 func (b *Binary) ReadFrom(r io.Reader) (n int64, err os.Error) {
@@ -246,8 +249,16 @@ func (b *Binary) ReadFrom(r io.Reader) (n int64, err os.Error) {
 
 type ObjectId []byte
 
+func (o *ObjectId) FromString(s string) (err os.Error) {
+	*o, err = hex.DecodeString(s)
+	return
+}
+
 func (o *ObjectId) String() string {
-	return fmt.Sprintf("%x", *o)
+	if *o == nil {
+		*o = make([]byte, 12)
+	}
+	return hex.EncodeToString(*o)
 }
 
 func (o *ObjectId) WriteTo(w io.Writer) (n int64, err os.Error) {
@@ -269,6 +280,16 @@ func (o *ObjectId) ReadFrom(r io.Reader) (n int64, err os.Error) {
 }
 
 type Boolean bool
+
+func False() *Boolean {
+	b := Boolean(false)
+	return &b
+}
+
+func True() *Boolean {
+	b := Boolean(true)
+	return &b
+}
 
 func (b *Boolean) WriteTo(w io.Writer) (n int64, err os.Error) {
 	var v byte
@@ -323,7 +344,7 @@ type Regex struct {
 }
 
 func (re *Regex) WriteTo(w io.Writer) (n int64, err os.Error) {
-	return write(w, re.Pattern, 0, re.Options, 0)
+	return write(w, []byte(re.Pattern), byte(0), []byte(re.Options), byte(0))
 }
 
 func (re *Regex) ReadFrom(r io.Reader) (n int64, err os.Error) {
@@ -452,6 +473,8 @@ func newElement(typ fieldType) (e Element) {
 		e = new(ObjectId)
 	case BooleanType:
 		e = new(Boolean)
+	case TimeType:
+		e = new(Time)
 	case NullType:
 		e = new(Null)
 	case RegexType:
@@ -496,6 +519,8 @@ func Typeof(e Element) (f fieldType) {
 		f = ObjectIdType
 	case *Boolean:
 		f = BooleanType
+	case *Time:
+		f = TimeType
 	case *Null:
 		f = NullType
 	case *Regex:

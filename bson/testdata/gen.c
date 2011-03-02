@@ -43,15 +43,17 @@ int main() {
 
 	// Document
 	bson_buffer_init( buf );
+	bson_append_start_object( buf, "d" );
+	bson_append_finish_object( buf );
 	bson_from_buffer( b, buf );
-	//TODO
 	hexprint(b);
 	bson_destroy( b );
 
 	// ArrayDocument
 	bson_buffer_init( buf );
+	bson_append_start_array( buf, "a" );
+	bson_append_finish_object( buf );
 	bson_from_buffer( b, buf );
-	//TODO
 	hexprint(b);
 	bson_destroy( b );
 
@@ -60,6 +62,7 @@ int main() {
 	int s_len = 26;
 	bson_buffer_init( buf );
 	bson_append_binary( buf, "b", 0, s, s_len );
+	bson_append_binary( buf, "b2", 2, s, s_len );
 	bson_from_buffer( b, buf );
 	hexprint( b );
 	bson_destroy( b );
@@ -99,6 +102,56 @@ int main() {
 	// Regex
 	bson_buffer_init( buf );
 	bson_append_regex( buf, "r", "[a-z]+", "i" );
+	bson_from_buffer( b, buf );
+	hexprint( b );
+	bson_destroy( b );
+
+	// Code
+	bson_buffer_init( buf );
+	bson_append_code( buf, "c", "function(a, b) { return a + b }" );
+	bson_from_buffer( b, buf );
+	hexprint( b );
+	bson_destroy( b );
+
+	// Symbol
+	bson_buffer_init( buf );
+	bson_append_symbol( buf, "s", "sex" );
+	bson_from_buffer( b, buf );
+	hexprint( b );
+	bson_destroy( b );
+
+	// ScopedCode
+	bson inner[1];
+	bson_buffer inner_buf[1];
+	bson_buffer_init( inner_buf );
+	bson_append_double( inner_buf, "a", 6 );
+	bson_append_double( inner_buf, "b", 4 );
+	bson_from_buffer( inner, inner_buf );
+	bson_buffer_init( buf );
+	bson_append_code_w_scope( buf, "sc", "a+b", inner );
+	bson_from_buffer( b, buf );
+	hexprint( b );
+	bson_destroy( b );
+	bson_destroy( inner );
+	
+	// Int32
+	bson_buffer_init( buf );
+	bson_append_int( buf, "i", 31337 );
+	bson_from_buffer( b, buf );
+	hexprint( b );
+	bson_destroy( b );
+
+	// Timestamp
+	bson_timestamp_t ts[1];
+	bson_buffer_init( buf );
+	bson_append_timestamp( buf, "t", ts );
+	bson_from_buffer( b, buf );
+	hexprint( b );
+	bson_destroy( b );
+
+	// Int64
+	bson_buffer_init( buf );
+	bson_append_long( buf, "i", 31337L );
 	bson_from_buffer( b, buf );
 	hexprint( b );
 	bson_destroy( b );

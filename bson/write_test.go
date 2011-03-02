@@ -149,13 +149,193 @@ func TestWriteBinary(t *testing.T) {
 
 	bin := &Binary{Subtype: 0, Data: []byte("1234567890abcdefghijklmnop")}
 	doc.Append("b", bin)
+	bin = &Binary{Subtype: 2, Data: []byte("1234567890abcdefghijklmnop")}
+	doc.Append("b2", bin)
 
-	if n, err := doc.WriteTo(buf); err != nil || n != 34 {
-		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 34, nil)
+	if n, err := doc.WriteTo(buf); err != nil || n != 78 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 78, nil)
 	}
 
 	gen := buf.Bytes()
 	if !bytes.Equal(testData[5], gen) {
 		t.Errorf("Document(%v).WriteTo(buf) != Binary from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[5])
+	}
+}
+
+func TestWriteObjectId(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+
+	oid := new(ObjectId)
+	oid.FromString("4d6d4cee9433e95b30cd38ec")
+	doc.Append("o", oid)
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 20 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 20, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[6], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != ObjectId from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[6])
+	}
+}
+
+func TestWriteBoolean(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	doc.Append("b", False())
+	doc.Append("c", True())
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 13 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 13, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[7], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Boolean from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[7])
+	}
+}
+
+func TestWriteTime(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	time := Time(20000)
+	doc.Append("t", &time)
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 16 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 16, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[8], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Time from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[8])
+	}
+}
+
+func TestWriteNull(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	doc.Append("n", new(Null))
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 8 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 8, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[9], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Null from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[9])
+	}
+}
+
+func TestWriteRegex(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	re := &Regex{Pattern: "[a-z]+", Options: "i"}
+	doc.Append("r", re)
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 17 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 17, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[10], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Regex from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[10])
+	}
+}
+
+func TestWriteCode(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	doc.Append("c", &Code{String("function(a, b) { return a + b }")})
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 44 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 44, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[11], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Code from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[11])
+	}
+}
+
+func TestWriteSymbol(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	doc.Append("s", &Symbol{String("sex")})
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 16 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 16, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[12], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Symbol from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[12])
+	}
+}
+
+func TestWriteScopedCode(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	inner := new(Document)
+	a := Double(6)
+	b := Double(4)
+	inner.Append("a", &a)
+	inner.Append("b", &b)
+	doc.Append("sc", &ScopedCode{Code: &Code{String("a+b")}, Scope: inner})
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 48 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 48, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[13], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != ScopedCode from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[13])
+	}
+}
+
+func TestWriteInt32(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	i := Int32(31337)
+	doc.Append("i", &i)
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 12 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 12, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[14], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Int32 from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[14])
+	}
+}
+
+func TestWriteTimestamp(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	doc.Append("t", &Timestamp{Int64(0)})
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 16 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 16, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[15], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Timestamp from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[15])
+	}
+}
+
+func TestWriteInt64(t *testing.T) {
+	buf.Reset()
+	doc := new(Document)
+	i := Int64(31337)
+	doc.Append("i", &i)
+
+	if n, err := doc.WriteTo(buf); err != nil || n != 16 {
+		t.Errorf("doc.WriteTo(buf) = (%d, %v), want (%d, %v)", n, err, 16, nil)
+	}
+
+	gen := buf.Bytes()
+	if !bytes.Equal(testData[16], gen) {
+		t.Errorf("Document(%v).WriteTo(buf) != Int64 from %s\nhave: %x\nwant: %x", doc, testFile, gen, testData[16])
 	}
 }

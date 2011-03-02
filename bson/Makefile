@@ -3,13 +3,6 @@
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
 
-include $(GOROOT)/src/Make.inc
-
-TARG=github.com/eclark/exl/bson
-GOFILES=\
-	types.go\
-	objectid.go\
-
 # These targets are only useful for regenerating test data
 # Check the first line of gen.c for the gcc options
 
@@ -20,5 +13,12 @@ testdata/hexdata: testdata/gen
 	testdata/gen >testdata/hexdata
 
 testdata: testdata/hexdata
+
+include $(GOROOT)/src/Make.inc
+
+TARG=github.com/eclark/exl/bson
+GOFILES=\
+	types.go\
+	objectid.go\
 
 include $(GOROOT)/src/Make.pkg
