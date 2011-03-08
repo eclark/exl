@@ -1,6 +1,7 @@
 package gridfs
 
 import (
+	"bytes"
 	"crypto/md5"
 	"fmt"
 	"github.com/eclark/exl/bson"
@@ -19,7 +20,7 @@ const (
 )
 
 type File struct {
-	Id mongo.BSON
+	Id bson.Element
 	Chunksize int
 	Size int64
 	Nchunk int
@@ -67,7 +68,10 @@ func Open(filename string, db *mongo.Database, prefix string) (*File, os.Error) 
 		file.Nchunk++
 	}
 
-	file.Id = filem.Get("id_")
+	idbuf := bytes.NewBuffer(filem.Get("id_").Bytes())
+
+	file.Id = new(bson.ObjectId)
+	file.Id.ReadFrom(idbuf)
 
 	return file, nil
 }
@@ -84,7 +88,7 @@ func (f *File) Read(b []byte) (n int, err os.Error) {
 			b = b[m:]
 			f.buf = f.buf[m:]
 		case f.nextc < f.Nchunk:
-			query, err := mongo.Marshal(map[string]interface{}{"files_id": f.Id, "n": int32(f.nextc)})
+			query, err := mongo.Marshal(map[string]interface{}{"files_id": bsoncompat.Wrap(f.Id), "n": int32(f.nextc)})
 			if err != nil {
 				return n, err
 			}
@@ -117,7 +121,7 @@ func New(filename string, db *mongo.Database, prefix string) (file *File, err os
 	}
 
 	file.Chunksize = defaultChunksize
-	file.Id, err = mongo.NewOID()
+	file.Id, err = bson.NewObjectId() //mongo.NewOID()
 	if err != nil {
 		return
 	}
@@ -152,12 +156,13 @@ func (f *File) Write(b []byte) (n int, err os.Error) {
 }
 
 func (f *File) writeChunk() os.Error {
-	chunk, err := mongo.Marshal(map[string]interface{}{"files_id": f.Id, "n": f.nextc, "data": f.buf})
-	if err != nil {
-		return err
-	}
+	chunk := new(bson.Document)
+	chunk.Append("files_id", f.Id)
+	chunk_n := bson.Int32(f.nextc)
+	chunk.Append("n", &chunk_n)
+	chunk.Append("data", &bson.Binary{bson.GenericType, f.buf})
 
-	err = f.db.GetCollection(f.prefix + chunksSuffix).Insert(chunk)
+	err := f.db.GetCollection(f.prefix + chunksSuffix).Insert(bsoncompat.Wrap(chunk))
 	if err != nil {
 		return err
 	}
@@ -179,10 +184,11 @@ func (f *File) Close() os.Error {
 	f.writeChunk()
 
 	md5cmddoc := new(bson.Document)
-	oid := bson.ObjectId(f.Id.Bytes())
 	pre := bson.String(f.prefix)
-	md5cmddoc.Append("filemd5", &oid)
+	md5cmddoc.Append("filemd5", f.Id)
 	md5cmddoc.Append("root", &pre)
+	testelem := bson.Int32(1)
+	md5cmddoc.Append("aaaa", &testelem)
 
 	res, err := f.db.Command(bsoncompat.Wrap(md5cmddoc))
 	if err != nil {
@@ -191,12 +197,21 @@ func (f *File) Close() os.Error {
 	fmt.Println(res.Bytes())
 	fmt.Println(res.Get("errmsg"))
 
-	file, err := mongo.Marshal(map[string]interface{}{"_id": f.Id, "length": int32(f.pos), "chunkSize": int32(f.Chunksize), "uploadDate": time.LocalTime(), "md5": res.Get("md5").String(), "filename": f.filename})
-	if err != nil {
-		return err
-	}
+	file := new(bson.Document)
+	file.Append("_id", f.Id)
+	filename_e := bson.String(f.filename)
+	file.Append("filename", &filename_e)
+	chunksize_e := bson.Int32(f.Chunksize)
+	file.Append("chunkSize", &chunksize_e)
+	time_e := bson.Time(time.Nanoseconds() / 1000)
+	file.Append("uploadDate", &time_e)
+	md5_e := bson.String(res.Get("md5").String())
 
-	err = f.db.GetCollection(f.prefix + filesSuffix).Insert(file)
+	file.Append("md5", &md5_e)
+	length_e := bson.Int64(f.pos)
+	file.Append("length", &length_e)
+
+	err = f.db.GetCollection(f.prefix + filesSuffix).Insert(bsoncompat.Wrap(file))
 	if err != nil {
 		return err
 	}

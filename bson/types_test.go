@@ -6,12 +6,12 @@ package bson
 
 import (
 	"bytes"
-	"github.com/eclark/gomongo/mongo"
+	//"github.com/eclark/gomongo/mongo"
 	"testing"
 )
 
 func TestA(t *testing.T) {
-	oid, _ := mongo.NewOID()
+/*	oid, _ := mongo.NewOID()
 	bs, err := mongo.Marshal(map[string]interface{}{"root": "fs", "files_id": oid})
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +36,7 @@ func TestA(t *testing.T) {
 
 	if !bytes.Equal(mongob, newb.Bytes()) {
 		t.Fatal("unmatched")
-	}
+	}*/
 }
 
 func TestB(t *testing.T) {

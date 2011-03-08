@@ -219,7 +219,7 @@ func (s *String) ReadFrom(r io.Reader) (n int64, err os.Error) {
 }
 
 type Binary struct {
-	Subtype byte
+	Subtype BinSubtype
 	Data    []byte
 }
 
