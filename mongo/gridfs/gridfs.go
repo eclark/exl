@@ -3,7 +3,6 @@ package gridfs
 import (
 	"bytes"
 	"crypto/md5"
-	"fmt"
 	"github.com/eclark/exl/bson"
 	"github.com/eclark/exl/bson/bsoncompat"
 	"github.com/eclark/gomongo/mongo"
@@ -194,8 +193,8 @@ func (f *File) Close() os.Error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(res.Bytes())
-	fmt.Println(res.Get("errmsg"))
+//	fmt.Println(res.Bytes())
+//	fmt.Println(res.Get("errmsg"))
 
 	file := new(bson.Document)
 	file.Append("_id", f.Id)
