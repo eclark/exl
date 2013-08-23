@@ -14,6 +14,7 @@ import (
 	"path"
 	"fmt"
 	"hash"
+	"errors"
 	//"log"
 )
 
@@ -37,14 +38,14 @@ type MD5Error struct {
 	CalcSum []byte
 }
 
-func (m MD5Error) String() string {
+func (m MD5Error) Error() string {
 	return fmt.Sprintf("MD5 mismatch: %x != %x", m.FileSum, m.CalcSum)
 }
 
 var magicSeq = []byte{'P','A','R','2',0,'P','K','T'}
 
-func OpenSet(file string) (set []*Set, err os.Error) {
-	rawRd, err := os.Open(file, os.O_RDONLY, 0)
+func OpenSet(file string) (set []*Set, err error) {
+	rawRd, err := os.OpenFile(file, os.O_RDONLY, 0)
 	if err != nil {
 		return
 	}
@@ -63,19 +64,16 @@ func OpenSet(file string) (set []*Set, err os.Error) {
 }
 
 
-func ReadFull(rawRd io.Reader)(set []*Set, err os.Error) {
+func ReadFull(rawRd io.Reader)(set []*Set, err error) {
 	var rdr io.Reader
-	rdr, err = bufio.NewReaderSize(rawRd, 1024*1024)
-	if err != nil {
-		rdr = rawRd
-	}
+	rdr = bufio.NewReaderSize(rawRd, 1024*1024)
 
 	sets := make(map[string]*Set)
 
-	OUTER: for {
+	for {
 		id, p, err := readPacket(rdr)
 		if err != nil {
-			if err == os.EOF {
+			if err == io.EOF {
 				break
 			}
 			return nil, err
@@ -110,7 +108,7 @@ func ReadFull(rawRd io.Reader)(set []*Set, err os.Error) {
 	return
 }
 
-func readPacket(in io.Reader) (setid string, p interface{}, err os.Error) {
+func readPacket(in io.Reader) (setid string, p interface{}, err error) {
 	rawHeader := make([]byte,64)
 	_, err = io.ReadFull(in, rawHeader)
 	if err != nil {
@@ -124,7 +122,7 @@ func readPacket(in io.Reader) (setid string, p interface{}, err os.Error) {
 	typ := rawHeader[48:64]
 
 	if !bytes.Equal(magicstr, magicSeq) {
-		return "", nil, os.NewError("Magic number does not match, stream is not PAR2")
+		return "", nil, errors.New("Magic number does not match, stream is not PAR2")
 	}
 
 	body := make([]byte,length - 64)
@@ -136,7 +134,7 @@ func readPacket(in io.Reader) (setid string, p interface{}, err os.Error) {
 	h := md5.New()
 	h.Write(rawHeader[32:])
 	h.Write(body)
-	calcsum := h.Sum()
+	calcsum := h.Sum([]byte{})
 	if !bytes.Equal(md5sum, calcsum) {
 		err = MD5Error{md5sum,calcsum}
 		return
@@ -178,7 +176,7 @@ func newVerifier(set *Set, fileid string) *Verifier {
 	return &Verifier{0,0,fileid,int(set.Main.SliceSize),set.Ifsc[fileid],0,md5.New(),0}
 }
 
-func (v *Verifier) Write(p []byte) (n int, err os.Error) {
+func (v *Verifier) Write(p []byte) (n int, err error) {
 	n = len(p)
 	for len(p) > 0 {
 		amt := len(p)
@@ -190,7 +188,7 @@ func (v *Verifier) Write(p []byte) (n int, err os.Error) {
 		p = p[amt:]
 
 		if v.w == v.slicesize {
-			if bytes.Equal(v.ifsc.Slices[v.sn].Hash, v.md5.Sum()) {
+			if bytes.Equal(v.ifsc.Slices[v.sn].Hash, v.md5.Sum([]byte{})) {
 				v.Good++
 			} else {
 				v.Bad++
@@ -204,7 +202,7 @@ func (v *Verifier) Write(p []byte) (n int, err os.Error) {
 	return
 }
 
-func (v *Verifier) Close() os.Error {
+func (v *Verifier) Close() error {
 	zeros := make([]byte, v.slicesize - v.w)
 	v.Write(zeros)
 
@@ -212,8 +210,8 @@ func (v *Verifier) Close() os.Error {
 }
 
 
-func (s *Set) Verify(fileid string) (good int, bad int, err os.Error) {
-	file, err := os.Open(path.Join(s.Path,s.FileDesc[fileid].Name), os.O_RDONLY, 0)
+func (s *Set) Verify(fileid string) (good int, bad int, err error) {
+	file, err := os.OpenFile(path.Join(s.Path,s.FileDesc[fileid].Name), os.O_RDONLY, 0)
 	if err != nil {
 		return
 	}
@@ -222,7 +220,7 @@ func (s *Set) Verify(fileid string) (good int, bad int, err os.Error) {
 	return s.VerifyReader(fileid, file)
 }
 
-func (s *Set) VerifyReader(fileid string, in io.Reader) (good int, bad int, err os.Error) {
+func (s *Set) VerifyReader(fileid string, in io.Reader) (good int, bad int, err error) {
 	v := newVerifier(s, fileid)
 
 	_, err = io.Copy(v, in)

@@ -32,7 +32,7 @@ func newFileDesc(data []byte) interface{} {
 	copy(f.StartHash,data[32:48])
 	f.Length = binary.LittleEndian.Uint64(data[48:56])
 
-	f.Name = strings.TrimRightFunc(string(data[56:]), func(r int) bool {
+	f.Name = strings.TrimRightFunc(string(data[56:]), func(r rune) bool {
 		return r == 0
 	})
 
